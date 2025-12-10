@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Snake Game with Leaderboard</title>
+  <style>
+    body {
+      background-color: #000;
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      color: white;
+      font-family: Arial, sans-serif;
+    }
+    .game-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-right: 30px;
+    }
+    canvas {
+      background-color: #111;
+      border: 2px solid #444;
+    }
+    #score {
+      margin: 10px;
+      font-size: 20px;
+    }
+    #message {
+      margin-top: 15px;
+      font-size: 24px;
+      font-weight: bold;
+    }
+    #restartBtn {
+      margin-top: 15px;
+      padding: 10px 20px;
+      font-size: 18px;
+      background-color: #444;
+      color: white;
+      border: none;
+      cursor: pointer;
+      display: none;
+    }
+    #restartBtn:hover {
+      background-color: #666;
+    }
+    .leaderboard {
+      background-color: #111;
+      border: 2px solid #444;
+      padding: 15px;
+      width: 200px;
+      height: 300px;
+    }
+    .leaderboard h2 {
+      text-align: center;
+      margin: 0 0 10px 0;
+      font-size: 20px;
+      border-bottom: 2px solid #444;
+      padding-bottom: 5px;
+    }
+    .leaderboard ol {
+      padding-left: 20px;
+      margin: 0;
+    }
+    .leaderboard li {
+      margin: 5px 0;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <div id="score">Score: 0</div>
+    <canvas id="gameCanvas" width="300" height="300"></canvas>
+    <div id="message">Press SPACE to start</div>
+    <button id="restartBtn">Restart Game</button>
+  </div>
+
+  <div class="leaderboard">
+    <h2>Leaderboard</h2>
+    <ol id="leaderboardList">
+      <!-- Scores will be injected here -->
+    </ol>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const box = 15; // smaller cells
+    let snake, direction, apple, score, game, gameStarted, gameOver;
+    let leaderboard = [];
+
+    const restartBtn = document.getElementById("restartBtn");
+    const message = document.getElementById("message");
+    const scoreDisplay = document.getElementById("score");
+    const leaderboardList = document.getElementById("leaderboardList");
+
+    function initGame() {
+      snake = [{x: 9*box, y: 10*box}];
+      direction = "RIGHT";
+      apple = {
+        x: Math.floor(Math.random()*(canvas.width/box))*box,
+        y: Math.floor(Math.random()*(canvas.height/box))*box
+      };
+      score = 0;
+      gameOver = false;
+      gameStarted = false;
+      scoreDisplay.innerText = "Score: " + score;
+      message.innerText = "Press SPACE to start";
+      restartBtn.style.display = "none";
+      drawBoard();
+    }
+
+    document.addEventListener("keydown", event => {
+      if(event.key === " " && !gameStarted) {
+        gameStarted = true;
+        message.innerText = "";
+        game = setInterval(draw, 100);
+      }
+      if(event.key === "ArrowLeft" && direction !== "RIGHT") direction = "LEFT";
+      else if(event.key === "ArrowUp" && direction !== "DOWN") direction = "UP";
+      else if(event.key === "ArrowRight" && direction !== "LEFT") direction = "RIGHT";
+      else if(event.key === "ArrowDown" && direction !== "UP") direction = "DOWN";
+    });
+
+    function drawBoard() {
+      for(let row=0; row<canvas.height/box; row++) {
+        for(let col=0; col<canvas.width/box; col++) {
+          ctx.fillStyle = (row+col)%2 === 0 ? "#222" : "#333"; // checkered dark grey
+          ctx.fillRect(col*box, row*box, box, box);
+        }
+      }
+    }
+
+    function draw() {
+      drawBoard();
+
+      // Draw apple
+      ctx.fillStyle = "red";
+      ctx.fillRect(apple.x, apple.y, box, box);
+
+      // Draw snake
+      for(let i=0; i<snake.length; i++) {
+        ctx.fillStyle = "white";
+        ctx.fillRect(snake[i].x, snake[i].y, box, box);
+      }
+
+      // Move snake
+      let snakeX = snake[0].x;
+      let snakeY = snake[0].y;
+
+      if(direction === "LEFT") snakeX -= box;
+      if(direction === "UP") snakeY -= box;
+      if(direction === "RIGHT") snakeX += box;
+      if(direction === "DOWN") snakeY += box;
+
+      // Check apple collision
+      if(snakeX === apple.x && snakeY === apple.y) {
+        score++;
+        scoreDisplay.innerText = "Score: " + score;
+        apple = {
+          x: Math.floor(Math.random()*(canvas.width/box))*box,
+          y: Math.floor(Math.random()*(canvas.height/box))*box
+        };
+      } else {
+        snake.pop();
+      }
+
+      let newHead = {x: snakeX, y: snakeY};
+
+      // Game over conditions
+      if(snakeX < 0 || snakeY < 0 || snakeX >= canvas.width || snakeY >= canvas.height || collision(newHead, snake)) {
+        clearInterval(game);
+        gameOver = true;
+        showGameOver();
+        updateLeaderboard(score);
+        return;
+      }
+
+      snake.unshift(newHead);
+
+      // Win condition
+      if(score >= 30) { // smaller board, lower win score
+        clearInterval(game);
+        showWin();
+        updateLeaderboard(score);
+      }
+    }
+
+    function collision(head, array) {
+      for(let i=0; i<array.length; i++) {
+        if(head.x === array[i].x && head.y === array[i].y) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function showGameOver() {
+      ctx.fillStyle = "red";
+      ctx.font = "24px Arial";
+      ctx.fillText("GAME OVER", 80, 150);
+      message.innerText = "The snake has fallen...";
+      restartBtn.style.display = "inline-block";
+
+      // Draw dead snake face
+      let head = snake[0];
+      ctx.fillStyle = "white";
+      ctx.fillRect(head.x, head.y, box, box);
+
+      // Crossed eyes
+      ctx.strokeStyle = "black";
+      ctx.beginPath();
+      ctx.moveTo(head.x+3, head.y+3);
+      ctx.lineTo(head.x+7, head.y+7);
+      ctx.moveTo(head.x+7, head.y+3);
+      ctx.lineTo(head.x+3, head.y+7);
+      ctx.moveTo(head.x+9, head.y+3);
+      ctx.lineTo(head.x+13, head.y+7);
+      ctx.moveTo(head.x+13, head.y+3);
+      ctx.lineTo(head.x+9, head.y+7);
+      ctx.stroke();
+
+      // Tongue sticking out
+      ctx.fillStyle = "red";
+      ctx.fillRect(head.x+6, head.y+10, 3, 5);
+    }
+
+    function showWin() {
+      ctx.fillStyle = "gold";
+      ctx.font = "24px Arial";
+      ctx.fillText("YOU WIN!", 90, 150);
+      ctx.fillText("👑", snake[0].x, snake[0].y); // Crown emoji
+      message.innerText = "The snake is crowned King!";
+      restartBtn.style.display = "inline-block";
+    }
+
+    function updateLeaderboard(newScore) {
+      leaderboard.push(newScore);
+      leaderboard.sort((a,b) => b-a);
+      leaderboard = leaderboard.slice(0,10); // keep top 10
+      renderLeaderboard();
+    }
+
+    function renderLeaderboard() {
+      leaderboardList.innerHTML = "";
+      leaderboard.forEach((score, index) => {
+        const li = document.createElement("li");
+        li.textContent = `${index+1}. ${score}`;
+        leaderboardList.appendChild(li);
+      });
+    }
+
+    restartBtn.addEventListener("click", () => {
+      clearInterval(game);
+      initGame();
+    });
+
+    // Initialize game state
+    initGame();
+  </script>
+</body>
+</html>
+
+
